@@ -6,25 +6,51 @@ A weekend proof-of-concept demonstrating a production-grade MLOps pipeline for c
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Stage 1: Local Development (Shift Left)                    │
-├─────────────────────────────────────────────────────────────┤
-│ • MLflow Docker stack (PostgreSQL + MinIO)                 │
-│ • Local PySpark preprocessing                              │
-│ • sklearn + MLflow model training                           │
-│ • pytest unit tests (no AWS)                                │
-│ Cost: $0                                                    │
-└─────────────────────────────────────────────────────────────┘
-                          ↓ (all green)
-┌─────────────────────────────────────────────────────────────┐
-│ Stage 2: AWS Cloud Validation                              │
-├─────────────────────────────────────────────────────────────┤
-│ • S3 bucket (raw data, processed features)                 │
-│ • EMR Serverless (PySpark job)                             │
-│ • GitHub Actions CI/CD (lint + pytest on push)             │
-│ Cost: <$1 for weekend testing                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Local["Stage 1 — Local Development (Cost: $0)"]
+        direction TB
+        CSV[("creditcard.csv\n(Kaggle)")]
+        PP_L["preprocess.py\n(local PySpark)"]
+        PARQ_L[("data/processed/\ntrain.parquet + test.parquet")]
+        TRAIN["train.py\n(scikit-learn)"]
+        REG["register_model.py"]
+
+        subgraph MLflow["MLflow Docker Stack"]
+            PG[("PostgreSQL\nmetadata")]
+            MINIO[("MinIO\nartifacts")]
+            UI["MLflow Server\nlocalhost:5000"]
+        end
+
+        CSV --> PP_L --> PARQ_L --> TRAIN
+        TRAIN -->|"metrics + model"| MLflow
+        MLflow --> REG
+    end
+
+    subgraph CI["GitHub Actions CI"]
+        GH["ci.yml\npush / PR"]
+        LINT["flake8 lint"]
+        TEST["pytest\n(no AWS)"]
+        GH --> LINT --> TEST
+    end
+
+    subgraph Cloud["Stage 2 — AWS Cloud (Cost: < $1)"]
+        direction TB
+        S3_RAW[("S3 raw/\ncreditcard.csv")]
+        EMR["EMR Serverless\npreprocess.py\n(Spark 3.5)"]
+        S3_PROC[("S3 processed/\ntrain.parquet + test.parquet")]
+
+        subgraph Infra["CDK Infrastructure"]
+            IAM["IAM Role\nEMR job execution"]
+            SSM["SSM Parameters\nbucket / app-id / role-arn"]
+        end
+
+        S3_RAW --> EMR --> S3_PROC
+        Infra -.->|"grants + config"| EMR
+    end
+
+    Local -->|"all green\nmake deploy-infra\nmake upload-data\nmake run-emr"| Cloud
+    Local -.->|"push to GitHub"| CI
 ```
 
 ## Shift-Left Development Flow
