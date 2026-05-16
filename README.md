@@ -8,49 +8,68 @@ A weekend proof-of-concept demonstrating a production-grade MLOps pipeline for c
 
 ```mermaid
 flowchart TD
+    %% ── Stage 1: Local Development ──────────────────────────────────────
     subgraph Local["Stage 1 — Local Development (Cost: $0)"]
         direction TB
-        CSV[("creditcard.csv\n(Kaggle)")]
-        PP_L["preprocess.py\n(local PySpark)"]
-        PARQ_L[("data/processed/\ntrain.parquet + test.parquet")]
-        TRAIN["train.py\n(scikit-learn)"]
-        REG["register_model.py"]
+        Dev((Developer))
+        CSV[("creditcard.csv\nKaggle download")]
+        PP_L["preprocess.py\nlocal PySpark"]
+        PARQ_L[("data/processed/\ntrain + test parquet")]
+        TRAIN["train.py\nscikit-learn LR"]
+        REG["register_model.py\nMLflow Registry"]
 
         subgraph MLflow["MLflow Docker Stack"]
-            PG[("PostgreSQL\nmetadata")]
-            MINIO[("MinIO\nartifacts")]
+            PG[("PostgreSQL\nrun metadata")]
+            MINIO[("MinIO\nmodel artifacts")]
             UI["MLflow Server\nlocalhost:5000"]
         end
 
-        CSV --> PP_L --> PARQ_L --> TRAIN
+        Dev -->|"make preprocess-local"| PP_L
+        CSV --> PP_L --> PARQ_L
+        PARQ_L -->|"make train-local"| TRAIN
         TRAIN -->|"metrics + model"| MLflow
-        MLflow --> REG
+        MLflow -->|"make register-local"| REG
     end
 
+    %% ── GitHub Actions CI ───────────────────────────────────────────────
     subgraph CI["GitHub Actions CI"]
         GH["ci.yml\npush / PR"]
-        LINT["flake8 lint"]
-        TEST["pytest\n(no AWS)"]
+        LINT["flake8"]
+        TEST["pytest\nno AWS needed"]
         GH --> LINT --> TEST
     end
 
+    %% ── Stage 2: AWS Cloud ──────────────────────────────────────────────
     subgraph Cloud["Stage 2 — AWS Cloud (Cost: < $1)"]
         direction TB
         S3_RAW[("S3 raw/\ncreditcard.csv")]
-        EMR["EMR Serverless\npreprocess.py\n(Spark 3.5)"]
-        S3_PROC[("S3 processed/\ntrain.parquet + test.parquet")]
+        EMR["EMR Serverless\npreprocess.py\nSpark 3.5"]
+        S3_PROC[("S3 processed/\ntrain + test parquet")]
 
-        subgraph Infra["CDK Infrastructure"]
+        subgraph Infra["CDK Stack"]
             IAM["IAM Role\nEMR job execution"]
-            SSM["SSM Parameters\nbucket / app-id / role-arn"]
+            SSM["SSM Parameters\nbucket · app-id · role-arn"]
         end
 
         S3_RAW --> EMR --> S3_PROC
         Infra -.->|"grants + config"| EMR
     end
 
-    Local -->|"all green\nmake deploy-infra\nmake upload-data\nmake run-emr"| Cloud
-    Local -.->|"push to GitHub"| CI
+    Local -->|"all green →\nmake deploy-infra\nmake upload-data\nmake run-emr"| Cloud
+    Dev -.->|"git push"| CI
+
+    %% ── Styles ──────────────────────────────────────────────────────────
+    classDef aws    fill:#232f3e,stroke:#f90,stroke-width:2px,color:#fff;
+    classDef actor  fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff;
+    classDef storage fill:#3b6e2e,stroke:#5aad47,stroke-width:2px,color:#fff;
+    classDef local  fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px,color:#fff;
+    classDef ci     fill:#4a1d6e,stroke:#9333ea,stroke-width:2px,color:#fff;
+
+    class EMR,IAM,SSM aws;
+    class Dev actor;
+    class CSV,PARQ_L,S3_RAW,S3_PROC,PG,MINIO storage;
+    class PP_L,TRAIN,REG,UI local;
+    class GH,LINT,TEST ci;
 ```
 
 ## Shift-Left Development Flow
