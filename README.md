@@ -9,64 +9,58 @@ A weekend proof-of-concept demonstrating a production-grade MLOps pipeline for c
 ```mermaid
 flowchart TD
     %% ── Stage 1: Local Development ──────────────────────────────────────
-    subgraph Local["Stage 1 — Local Development (Cost: $0)"]
-        direction TB
-        Dev((Developer))
+    subgraph Local["Stage 1 — Local Development  ·  Cost: $0"]
         CSV[("creditcard.csv\nKaggle download")]
         PP_L["preprocess.py\nlocal PySpark"]
         PARQ_L[("data/processed/\ntrain + test parquet")]
         TRAIN["train.py\nscikit-learn LR"]
-        REG["register_model.py\nMLflow Registry"]
 
         subgraph MLflow["MLflow Docker Stack"]
             PG[("PostgreSQL\nrun metadata")]
-            MINIO[("MinIO\nmodel artifacts")]
+            MINIO[("MinIO\nartifacts")]
             UI["MLflow Server\nlocalhost:5000"]
         end
 
-        Dev -->|"make preprocess-local"| PP_L
-        CSV --> PP_L --> PARQ_L
-        PARQ_L -->|"make train-local"| TRAIN
-        TRAIN -->|"metrics + model"| MLflow
-        MLflow -->|"make register-local"| REG
+        REG["register_model.py\nMLflow Registry"]
+
+        CSV --> PP_L --> PARQ_L --> TRAIN
+        TRAIN -->|"metrics + model"| PG & MINIO
+        PG & MINIO --> UI --> REG
     end
 
     %% ── GitHub Actions CI ───────────────────────────────────────────────
-    subgraph CI["GitHub Actions CI"]
-        GH["ci.yml\npush / PR"]
-        LINT["flake8"]
+    subgraph CI["GitHub Actions CI  ·  on push / PR"]
+        GH["ci.yml"]
+        LINT["flake8 lint"]
         TEST["pytest\nno AWS needed"]
         GH --> LINT --> TEST
     end
 
     %% ── Stage 2: AWS Cloud ──────────────────────────────────────────────
-    subgraph Cloud["Stage 2 — AWS Cloud (Cost: < $1)"]
-        direction TB
-        S3_RAW[("S3 raw/\ncreditcard.csv")]
-        EMR["EMR Serverless\npreprocess.py\nSpark 3.5"]
-        S3_PROC[("S3 processed/\ntrain + test parquet")]
-
+    subgraph Cloud["Stage 2 — AWS Cloud  ·  Cost: &lt;$1"]
         subgraph Infra["CDK Stack"]
             IAM["IAM Role\nEMR job execution"]
             SSM["SSM Parameters\nbucket · app-id · role-arn"]
         end
 
+        S3_RAW[("S3 raw/\ncreditcard.csv")]
+        EMR["EMR Serverless\npreprocess.py · Spark 3.5"]
+        S3_PROC[("S3 processed/\ntrain + test parquet")]
+
         S3_RAW --> EMR --> S3_PROC
         Infra -.->|"grants + config"| EMR
     end
 
-    Local -->|"all green →\nmake deploy-infra\nmake upload-data\nmake run-emr"| Cloud
-    Dev -.->|"git push"| CI
+    Local -->|"all green ✓"| Cloud
+    Local -.->|"git push"| CI
 
     %% ── Styles ──────────────────────────────────────────────────────────
-    classDef aws    fill:#232f3e,stroke:#f90,stroke-width:2px,color:#fff;
-    classDef actor  fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff;
+    classDef aws     fill:#232f3e,stroke:#f90,stroke-width:2px,color:#fff;
     classDef storage fill:#3b6e2e,stroke:#5aad47,stroke-width:2px,color:#fff;
-    classDef local  fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px,color:#fff;
-    classDef ci     fill:#4a1d6e,stroke:#9333ea,stroke-width:2px,color:#fff;
+    classDef local   fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px,color:#fff;
+    classDef ci      fill:#4a1d6e,stroke:#9333ea,stroke-width:2px,color:#fff;
 
     class EMR,IAM,SSM aws;
-    class Dev actor;
     class CSV,PARQ_L,S3_RAW,S3_PROC,PG,MINIO storage;
     class PP_L,TRAIN,REG,UI local;
     class GH,LINT,TEST ci;
@@ -297,9 +291,7 @@ make register-local
 - EMR job execution role (scoped to bucket + logs)
 - GitHub OIDC role (EMR Serverless only, no EC2 access)
 
-## Interview Talking Points
-
-This POC demonstrates:
+## This POC Demonstrates
 
 1. **Shift-Left Development** — All components validated locally before cloud spend
 2. **PySpark on EMR Serverless** — Modern, serverless approach; no idle cluster costs
@@ -358,5 +350,4 @@ This is a learning/interview POC. Licensed under MIT.
 
 ---
 
-**Built for RBC GFT Lead Cloud MLOps Engineer role.**
-**Target: demonstrate PySpark, MLflow, GitHub Actions, AWS CDK, and fraud detection domain knowledge.**
+**Demonstrates PySpark, MLflow, GitHub Actions, AWS CDK, and fraud detection domain knowledge.**
