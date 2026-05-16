@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (too large for git — download from Kaggle, upload via make upload-data)
+data/creditcard.csv
+data/processed/
+creditcardfraud.zip
+mlflow.db
+mlruns/
+*.parquet
+
+# AWS CDK
+infra/cdk.out/
+infra/dist/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+.env.local
+
+# MinIO/MLflow
+postgres_data/
+minio_data/
+
+# Logs
+*.log

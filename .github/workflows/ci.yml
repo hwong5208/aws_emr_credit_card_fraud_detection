@@ -1,0 +1,27 @@
+name: CI — Lint & Test
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -q flake8 pytest pyspark mlflow scikit-learn pandas imbalanced-learn python-dotenv
+
+      - name: Lint with flake8
+        run: flake8 src/ scripts/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Test with pytest
+        run: pytest tests/ -v --tb=short
